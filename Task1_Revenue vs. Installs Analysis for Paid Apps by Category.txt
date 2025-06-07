@@ -1,0 +1,41 @@
+import pandas as pd
+import plotly.express as px
+
+# Load your dataset
+df = pd.read_csv('D:/Project/googleplaystore.csv')
+
+# Clean the Price and Installs columns
+df = df[df['Price'].str.contains('^[0-9\.\$\,]+$', regex=True, na=False)]  # Clean rows with invalid Price
+df['Price'] = df['Price'].str.replace('[\$\,]', '', regex=True).astype(float)
+df['Installs'] = df['Installs'].str.replace('[\+,]', '', regex=True).astype(float)
+
+# Handle missing values in 'Price' or 'Installs' columns
+df = df.dropna(subset=['Price', 'Installs'])
+
+# Filter for paid apps only (Price > 0)
+paid_apps = df[df['Price'] > 0]
+
+# Calculate Revenue = Price * Installs
+paid_apps['Revenue'] = paid_apps['Price'] * paid_apps['Installs']
+
+# Create scatter plot using plotly with trendline
+fig = px.scatter(paid_apps, x='Installs', y='Revenue', color='Category',
+                 title='Relationship between Revenue and Number of Installs for Paid Apps',
+                 labels={'Installs': 'Number of Installs', 'Revenue': 'Revenue (USD)'},
+                 log_x=True, log_y=True, trendline="ols",
+                 hover_data=['App', 'Category', 'Installs', 'Revenue'])  # Hover information for scatter points
+
+# Disable hover info for the trendline
+fig.update_traces(hoverinfo='skip', selector=dict(mode='lines'))
+
+# Ensure that hover information only shows for scatter points (individual apps)
+fig.update_traces(hoverinfo='text', selector=dict(mode='markers'))
+
+# Show hover data for apps only
+fig.update_layout(hovermode="closest")  # Ensure hover details appear for individual points
+
+# Save the plot as an HTML file
+fig.write_html('google_play_paid_apps_revenue_with_trendline.html')
+
+# Show the plot in the browser
+fig.show()
