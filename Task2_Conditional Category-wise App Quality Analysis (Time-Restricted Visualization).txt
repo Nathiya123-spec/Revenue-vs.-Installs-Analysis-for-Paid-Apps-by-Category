@@ -1,0 +1,74 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick  # Import for formatting
+from datetime import datetime
+import pytz
+
+# Load the dataset
+file_path = 'D:/Project/googleplaystore.csv'  # Replace with your actual file path
+df = pd.read_csv(file_path)
+
+# Data Preprocessing
+def convert_size(size):
+    if isinstance(size, str):
+        if 'M' in size:
+            return float(size.replace('M', ''))
+        elif 'k' in size:
+            return float(size.replace('k', '')) / 1024
+        elif size.lower() == 'free':
+            return pd.NA
+    return pd.NA
+
+# Clean and convert relevant columns
+df['Size'] = df['Size'].astype(str).map(convert_size)
+df['Installs'] = df['Installs'].str.replace('[+,]', '', regex=True).apply(pd.to_numeric, errors='coerce')
+df['Last Updated'] = pd.to_datetime(df['Last Updated'], errors='coerce')
+
+# Drop rows with invalid data
+df.dropna(subset=['Size', 'Rating', 'Installs', 'Reviews', 'Last Updated'], inplace=True)
+
+# Filter data
+filtered_df = df[(df['Rating'] >= 4.0) & (df['Size'] >= 10) & (df['Last Updated'].dt.month == 1)]
+
+# Group by category
+grouped = filtered_df.groupby('Category').agg({'Rating': 'mean', 'Reviews': 'sum', 'Installs': 'sum'}).reset_index()
+top_categories = grouped.nlargest(10, 'Installs')
+
+# Time check for 3 PM to 5 PM IST
+ist = pytz.timezone('Asia/Kolkata')
+current_time = datetime.now().astimezone(ist)
+
+print("Current Time (IST):", current_time)
+
+# If current time is between 3 PM and 5 PM IST, display and save the graph
+if 15 <= current_time.hour < 17:
+    # Plotting grouped bar chart
+    fig, ax = plt.subplots(figsize=(10, 6))
+    x = range(len(top_categories))
+
+    # Plot bars for Average Rating and Total Reviews
+    ax.bar([i - 0.2 for i in x], top_categories['Rating'], width=0.4, label='Average Rating', color='blue')
+    ax.bar([i + 0.2 for i in x], top_categories['Reviews'], width=0.4, label='Total Reviews', color='green')
+
+    # Setting chart titles and labels
+    ax.set_title("Top 10 App Categories by Installs (Filtered)")
+    ax.set_xlabel("App Category")
+    ax.set_ylabel("Values")
+    ax.set_xticks(x)
+    ax.set_xticklabels(top_categories['Category'], rotation=45)
+    ax.legend()
+
+    # Format the Y-axis numbers for better readability
+    ax.yaxis.set_major_formatter(mtick.FuncFormatter(lambda x, _: f'{x:,.0f}'))
+
+    # Save the plot as an HTML file using mpld3
+    import mpld3
+    html_output = mpld3.fig_to_html(fig)
+    with open("top_10_app_categories.html", "w") as f:
+        f.write(html_output)
+
+    print("Plot saved as top_10_app_categories.html")
+    plt.tight_layout()
+    plt.show()
+else:
+    print("Graph not available outside 3 PM IST to 5 PM IST.")
